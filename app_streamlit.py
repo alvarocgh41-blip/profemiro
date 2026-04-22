@@ -147,12 +147,11 @@ if "_accion_bd" in st.session_state:
             _db.commit(); st.session_state["_ok_msg"] = f"Examen '{_nombre_sesion}' lanzado."
 
         elif _accion["tipo"] == "reabrir_sesion":
-            # Reabrir sala con la sesión ya existente (sin crear nueva)
             _cur.execute(
-                "UPDATE salas_activas SET estado='en_progreso' WHERE nombre_sala=%s",
+                "UPDATE salas_activas SET estado='esperando' WHERE nombre_sala=%s",
                 (_sala_nom,)
             )
-            _db.commit(); st.session_state["_ok_msg"] = "Sala reabierta."
+            _db.commit(); st.session_state["_ok_msg"] = "Sala abierta."
         
         elif _accion["tipo"] == "terminar_examen":
             _cur.execute(
@@ -1788,12 +1787,14 @@ def _render_detalle_alumno(n_a, alumnos, preguntas_ord):
     total = sum(float(r.get("puntuacion") or 0) for r in rs.values())
     fecha_str = alumnos[n_a]["fecha"].strftime("%d/%m/%Y %H:%M") if alumnos[n_a]["fecha"] else "—"
 
+    n_total_preg = len(preguntas_ord)
+    pct = round(total / n_total_preg * 100) if n_total_preg > 0 else 0
     st.markdown(
         f'<div style="background:linear-gradient(135deg,#ede9fe,#ddd6fe);border-radius:16px;'
         f'padding:16px 22px;margin-bottom:16px;border-left:5px solid #7c3aed;">'
         f'<span style="font-size:1.1rem;font-weight:900;color:#4c1d95;">{n_a}</span>'
         f'<span style="margin-left:14px;background:#7c3aed;color:white;border-radius:20px;'
-        f'padding:4px 14px;font-size:.85rem;font-weight:800;">{total:.1f} pts</span>'
+        f'padding:4px 14px;font-size:.85rem;font-weight:800;">{pct}% ({total:.2g}/{n_total_preg})</span>'
         f'<span style="margin-left:10px;color:#6b7280;font-size:.82rem;">{fecha_str}</span>'
         f'</div>', unsafe_allow_html=True)
 
@@ -1956,22 +1957,22 @@ def pg_resultados():
         for n_a in nombres:
             rs = alumnos[n_a]["respuestas"]
             total = sum(float(r.get("puntuacion") or 0) for r in rs.values())
-            nt = sum(1 for r in rs.values() if r.get("tipo")=="test")
-            nb = sum(1 for r in rs.values() if r.get("tipo")=="test" and
-                     str(r.get("contenido_respuesta") or "").strip().lower()==str(r.get("respuesta_modelo") or "").strip().lower())
+            n_total_preg = len(preguntas_ord)
+            puntos = sum(float(r.get("puntuacion") or 0) for r in rs.values())
+            pct = round(puntos / n_total_preg * 100) if n_total_preg > 0 else 0
             fecha_str = alumnos[n_a]["fecha"].strftime("%d/%m/%Y %H:%M") if alumnos[n_a]["fecha"] else "—"
             filas_tabla += (f'<tr>'
                             f'<td style="padding:10px 16px;font-weight:700;">{n_a}</td>'
-                            f'<td style="padding:10px 16px;text-align:center;font-weight:800;color:#7c3aed;">{total:.1f}</td>'
-                            f'<td style="padding:10px 16px;text-align:center;color:#6b7280;">{nb}/{nt} test</td>'
+                            f'<td style="padding:10px 16px;text-align:center;font-weight:800;color:#7c3aed;">{pct}%</td>'
+                            f'<td style="padding:10px 16px;text-align:center;color:#6b7280;">{puntos:.1g}/{n_total_preg} preg</td>'
                             f'<td style="padding:10px 16px;text-align:center;color:#9ca3af;font-size:.82rem;">{fecha_str}</td>'
                             f'</tr>')
         st.markdown(f"""<div class="card" style="padding:0;overflow:hidden;">
             <table style="width:100%;border-collapse:collapse;">
             <thead><tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb;">
                 <th style="padding:12px 16px;text-align:left;color:#6b7280;font-size:.8rem;text-transform:uppercase;">Alumno</th>
-                <th style="padding:12px 16px;text-align:center;color:#6b7280;font-size:.8rem;text-transform:uppercase;">Nota</th>
-                <th style="padding:12px 16px;text-align:center;color:#6b7280;font-size:.8rem;text-transform:uppercase;">Test</th>
+                <th style="padding:12px 16px;text-align:center;color:#6b7280;font-size:.8rem;text-transform:uppercase;">%</th>
+                <th style="padding:12px 16px;text-align:center;color:#6b7280;font-size:.8rem;text-transform:uppercase;">Preguntas</th>
                 <th style="padding:12px 16px;text-align:center;color:#6b7280;font-size:.8rem;text-transform:uppercase;">Fecha</th>
             </tr></thead><tbody>{filas_tabla}</tbody></table></div>""", unsafe_allow_html=True)
 
@@ -2040,12 +2041,14 @@ def pg_resultados():
             abierto = gs(open_k, False)
             col_info, col_btn = st.columns([5, 1])
             with col_info:
+                n_total_preg_l = len(preguntas_ord)
+                pct_l = round(total / n_total_preg_l * 100) if n_total_preg_l > 0 else 0
                 st.markdown(
                     f'<div style="background:white;border-radius:12px;padding:12px 18px;'
                     f'border:1px solid #e5e7eb;margin-bottom:2px;">'
                     f'<span style="font-weight:800;color:#1f2937;">{n_a}</span>'
                     f'<span style="margin-left:12px;background:#ede9fe;color:#5b21b6;'
-                    f'border-radius:20px;padding:3px 12px;font-size:.8rem;font-weight:800;">{total:.1f} pts</span>'
+                    f'border-radius:20px;padding:3px 12px;font-size:.8rem;font-weight:800;">{pct_l}% ({total:.2g}/{n_total_preg_l})</span>'
                     f'<span style="margin-left:8px;color:#9ca3af;font-size:.8rem;">{fecha_str}</span>'
                     f'</div>', unsafe_allow_html=True)
             with col_btn:
