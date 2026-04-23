@@ -641,6 +641,8 @@ def render_topbar_profe(nombre_sala=None, tab="launcher"):
             f'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">'
             f'{logo_svg(36)}'
             f'<span style="font-size:1.3rem;font-weight:900;color:#4c1d95;">Profe<span style="color:#7c3aed;">Miro</span></span>'
+            f'<span style="font-size:0.7rem;font-weight:800;color:#a78bfa;background:#ede9fe;'
+            f'border-radius:20px;padding:2px 8px;margin-left:4px;">v6</span>'
             f'&nbsp;{chip}</div>',
             unsafe_allow_html=True)
     with col_nav:
@@ -1291,9 +1293,14 @@ def pg_launcher():
         db.close()
     except Exception as e: st.error(f"Error: {e}"); return
 
-    sala_activa = bool(sala_info and sala_info["estado"] == "en_progreso")
+    sala_activa  = bool(sala_info and sala_info["estado"] == "en_progreso")
     sala_abierta = bool(sala_info and sala_info["estado"] in ("en_progreso", "esperando"))
-    quiz_tit_activo=next((q["titulo"] for q in quizzes if sala_activa and q["id_quiz"]==sala_info["id_quiz_activo"]),"")
+    # Mostrar quiz activo aunque el estado sea 'esperando' (quiz ya lanzado pero terminado)
+    quiz_tit_activo = next(
+        (q["titulo"] for q in quizzes
+         if sala_info and q["id_quiz"] == sala_info.get("id_quiz_activo")),
+        ""
+    )
 
     # ── Mis salas ────────────────────────────────────────────────
     st.markdown('<div style="font-weight:900;color:#4c1d95;font-size:1rem;margin-bottom:8px;">Mis salas</div>',unsafe_allow_html=True)
@@ -1334,6 +1341,13 @@ def pg_launcher():
                      f'<div style="opacity:.95;font-size:.88rem;">Codigo: <strong>{nombre_sala}</strong>'
                      f'{" · " + sesion_activa_nombre if sesion_activa_nombre else ""}'
                      f' · {quiz_tit_activo}</div></div>')
+    elif sala_abierta and quiz_tit_activo:
+        # Sala abierta con quiz asignado (examen terminado pero sala no cerrada)
+        sala_html = (f'<div class="card-blue" style="margin-bottom:0;padding:18px 24px;">'
+                     f'<div style="font-size:.95rem;font-weight:900;margin-bottom:4px;">🔵 EXAMEN TERMINADO — sala abierta</div>'
+                     f'<div style="opacity:.95;font-size:.88rem;">Codigo: <strong>{nombre_sala}</strong>'
+                     f'{" · " + sesion_activa_nombre if sesion_activa_nombre else ""}'
+                     f' · {quiz_tit_activo}</div></div>')
     elif sala_abierta:
         sala_html = (f'<div class="card-blue" style="margin-bottom:0;padding:18px 24px;">'
                      f'<div style="font-size:.95rem;font-weight:900;margin-bottom:4px;">🔵 SALA ABIERTA</div>'
@@ -1356,13 +1370,20 @@ def pg_launcher():
                      disabled=not puede_abrir, type="secondary"):
             ss("_accion_bd",{"tipo":"reabrir_sesion"}); st.rerun()
     with c_terminar:
-        if st.button("⏹ Terminar examen", use_container_width=True, key="l_terminar",
+        if st.button("⏹ Cerrar acceso", use_container_width=True, key="l_terminar",
                      disabled=not sala_activa, type="primary"):
             ss("_accion_bd",{"tipo":"terminar_examen"}); st.rerun()
     with c_cerrar:
         if st.button("🔒 Cerrar sala", use_container_width=True, key="l_cerrar",
                      disabled=sala_activa, type="secondary"):
             ss("_accion_bd",{"tipo":"cerrar_sala"}); st.rerun()
+
+    if sala_activa:
+        st.markdown('<div style="background:#fef3c7;border-radius:10px;padding:8px 16px;'
+                    'margin-top:8px;font-size:.8rem;color:#92400e;font-weight:700;">'
+                    '⚠️ <b>Cerrar acceso</b> impide que nuevos alumnos entren. '
+                    'La sala sigue abierta para ver resultados.</div>',
+                    unsafe_allow_html=True)
 
     # ── Consola de sala ──────────────────────────────────────────
     if sala_activa and registros is not None:
@@ -2256,96 +2277,191 @@ def _pg_crear_doc_revisar():
 # ════════════════════════════════════════════════════════════════════
 def pg_crear_manual():
     render_topbar(gs("nombre_sala"))
-    if st.button("← Volver a Biblioteca",key="man_back"): ir("biblioteca"); return
+    if st.button("← Volver a Biblioteca", key="man_back"):
+        # Limpiar estado al salir
+        ss("man_preguntas_guardadas", [])
+        ss("man_añadiendo", False)
+        ir("biblioteca"); return
+
     st.markdown('<div class="card-orange"><h2 style="color:white;margin:0 0 6px;">Crear Quiz Manual</h2>'
-                '<p style="color:rgba(255,255,255,.9);margin:0;">Diseña el examen pregunta a pregunta.</p></div>',unsafe_allow_html=True)
-    if "num_preg_manual" not in st.session_state: ss("num_preg_manual",1)
-    titulo=st.text_input("Titulo del Quiz",placeholder="Ej: Examen Biologia",key="man_tit")
-    seccion=widget_seccion(gs("profe_id"),key_prefix="man")
-    if st.button("Añadir pregunta",key="man_add"): ss("num_preg_manual",gs("num_preg_manual")+1); st.rerun()
-    COLORES=["#7c3aed","#059669","#dc2626","#d97706","#0284c7","#db2777"]
-    preguntas_data=[]
-    for i in range(gs("num_preg_manual",1)):
-        c=COLORES[i%len(COLORES)]
-        st.markdown(f'<div style="background:white;border-radius:18px;padding:14px 20px;margin:14px 0 6px 0;border-left:6px solid {c};box-shadow:0 4px 16px rgba(0,0,0,.06);">'
-                    f'<span style="background:{c};color:white;border-radius:20px;padding:4px 14px;font-size:.8rem;font-weight:800;">PREGUNTA {i+1}</span></div>',unsafe_allow_html=True)
-        enunciado=st.text_input(f"Enunciado {i+1}",key=f"man_enc_{i}",placeholder=f"Escribe la pregunta {i+1}...",label_visibility="collapsed")
-        mostrar_img=st.checkbox(f"Añadir imagen a pregunta {i+1} (opcional)",key=f"man_chk_{i}")
-        imagen_final=""
+                '<p style="color:rgba(255,255,255,.9);margin:0;">Diseña el examen pregunta a pregunta.</p></div>',
+                unsafe_allow_html=True)
+
+    if gs("_ok_msg"): st.success(st.session_state.pop("_ok_msg"))
+    if gs("_error_msg"): st.error(st.session_state.pop("_error_msg"))
+
+    # Estado persistente de preguntas ya confirmadas
+    if "man_preguntas_guardadas" not in st.session_state:
+        ss("man_preguntas_guardadas", [])
+    if "man_añadiendo" not in st.session_state:
+        ss("man_añadiendo", False)
+
+    titulo  = st.text_input("Título del Quiz", placeholder="Ej: Examen Biología", key="man_tit")
+    seccion = widget_seccion(gs("profe_id"), key_prefix="man")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    preguntas_guardadas = gs("man_preguntas_guardadas", [])
+    COLORES = ["#7c3aed","#059669","#dc2626","#d97706","#0284c7","#db2777"]
+
+    # ── Lista de preguntas ya añadidas ───────────────────────────
+    if preguntas_guardadas:
+        st.markdown(f'<div style="font-weight:900;color:#4c1d95;font-size:1rem;margin-bottom:10px;">'
+                    f'Preguntas añadidas ({len(preguntas_guardadas)})</div>', unsafe_allow_html=True)
+        for i, p in enumerate(preguntas_guardadas):
+            c = COLORES[i % len(COLORES)]
+            tipo_label = {"corta": "Corta", "test2": "Test 2 op.", "test4": "Test 4 op."}.get(p["tipo"], p["tipo"])
+            st.markdown(
+                f'<div style="background:white;border-radius:14px;padding:14px 18px;'
+                f'border-left:5px solid {c};margin-bottom:4px;box-shadow:0 2px 8px rgba(0,0,0,.05);">'
+                f'<span style="background:{c};color:white;border-radius:20px;padding:2px 10px;'
+                f'font-size:.72rem;font-weight:800;">{tipo_label}</span>'
+                f'<div style="font-weight:700;color:#1f2937;margin-top:6px;">{i+1}. {p["enunciado"]}</div>'
+                f'<div style="color:#6b7280;font-size:.8rem;margin-top:2px;">✅ {p["respuesta_modelo"]}</div>'
+                f'</div>', unsafe_allow_html=True)
+            if st.button(f"🗑 Eliminar P{i+1}", key=f"man_del_{i}", use_container_width=True):
+                nuevas = preguntas_guardadas[:i] + preguntas_guardadas[i+1:]
+                ss("man_preguntas_guardadas", nuevas)
+                st.rerun()
+            st.markdown("<hr>", unsafe_allow_html=True)
+    else:
+        st.markdown('<div style="text-align:center;padding:28px;background:white;border-radius:14px;'
+                    'border:2px dashed #d1d5db;color:#9ca3af;margin-bottom:16px;">'
+                    '<div style="font-size:2rem;">✏️</div>'
+                    '<div style="font-weight:700;">Aún no hay preguntas. Pulsa "Añadir pregunta".</div>'
+                    '</div>', unsafe_allow_html=True)
+
+    # ── Formulario de nueva pregunta ─────────────────────────────
+    añadiendo = gs("man_añadiendo", False)
+
+    if not añadiendo:
+        if st.button("➕ Añadir pregunta", key="man_add", use_container_width=True, type="primary"):
+            ss("man_añadiendo", True)
+            st.rerun()
+    else:
+        i_nueva = len(preguntas_guardadas)
+        c = COLORES[i_nueva % len(COLORES)]
+        st.markdown(f'<div style="background:white;border-radius:18px;padding:16px 22px;'
+                    f'margin:14px 0 6px 0;border-left:6px solid {c};'
+                    f'box-shadow:0 4px 16px rgba(0,0,0,.08);">'
+                    f'<span style="background:{c};color:white;border-radius:20px;'
+                    f'padding:4px 14px;font-size:.8rem;font-weight:800;">NUEVA PREGUNTA {i_nueva+1}</span>'
+                    f'</div>', unsafe_allow_html=True)
+
+        enunciado = st.text_input("Enunciado", key="man_new_enc",
+                                  placeholder="Escribe la pregunta aquí...")
+
+        mostrar_img = st.checkbox("Añadir imagen (opcional)", key="man_new_chk")
+        imagen_final = ""
         if mostrar_img:
-            tipo_img=st.radio("","📁 Subir archivo,🔗 URL".split(","),key=f"man_imt_{i}",horizontal=True,label_visibility="collapsed")
-            if tipo_img=="📁 Subir archivo":
-                up=st.file_uploader("",type=["png","jpg","jpeg","gif","webp"],key=f"man_imf_{i}",label_visibility="collapsed")
+            tipo_img = st.radio("", ["📁 Subir archivo", "🔗 URL"],
+                                key="man_new_imt", horizontal=True, label_visibility="collapsed")
+            if tipo_img == "📁 Subir archivo":
+                up = st.file_uploader("", type=["png","jpg","jpeg","gif","webp"],
+                                      key="man_new_imf", label_visibility="collapsed")
                 if up:
-                    b64s=base64.b64encode(up.read()).decode(); imagen_final=f"data:{up.type};base64,{b64s}"; st.image(imagen_final,width=280)
+                    b64s = base64.b64encode(up.read()).decode()
+                    imagen_final = f"data:{up.type};base64,{b64s}"
+                    st.image(imagen_final, width=280)
             else:
-                url_img=st.text_input("URL",key=f"man_imu_{i}",placeholder="https://...",label_visibility="collapsed")
+                url_img = st.text_input("URL", key="man_new_imu",
+                                        placeholder="https://...", label_visibility="collapsed")
                 if url_img.strip():
-                    imagen_final=url_img.strip()
-                    try: st.image(url_img,width=280)
+                    imagen_final = url_img.strip()
+                    try: st.image(url_img, width=280)
                     except: st.warning("No se puede previsualizar.")
 
-        tipo_key = f"man_tipo_sel_{i}"
         opciones_tipo = ["Respuesta corta", "Test — 2 opciones", "Test — 4 opciones"]
-        tipo_idx_guardado = gs(tipo_key, 0)
-        tipo_sel_nuevo = st.radio(
-            f"Tipo P{i+1}", opciones_tipo,
-            index=tipo_idx_guardado,
-            key=f"man_tipo_{i}",
-            horizontal=True, label_visibility="collapsed"
-        )
-        nuevo_idx = opciones_tipo.index(tipo_sel_nuevo)
-        if nuevo_idx != tipo_idx_guardado:
-            ss(tipo_key, nuevo_idx)
-            st.rerun()
+        tipo_sel = st.radio("Tipo de pregunta", opciones_tipo,
+                            key="man_new_tipo", horizontal=True, label_visibility="collapsed")
+        tipo = {"Respuesta corta":"corta","Test — 2 opciones":"test2","Test — 4 opciones":"test4"}[tipo_sel]
 
-        tipo_sel = tipo_sel_nuevo
-        tipo={"Respuesta corta":"corta","Test — 2 opciones":"test2","Test — 4 opciones":"test4"}[tipo_sel]
-        opciones_data=[]; resp_modelo=""
-        if tipo=="corta":
-            resp_modelo=st.text_input(f"Respuesta modelo {i+1}",key=f"man_rm_{i}",placeholder="Respuesta esperada...")
+        opciones_data = []; resp_modelo = ""
+        if tipo == "corta":
+            resp_modelo = st.text_input("Respuesta modelo", key="man_new_rm",
+                                        placeholder="Respuesta esperada...")
         else:
-            n_ops=2 if tipo=="test2" else 4
-            st.markdown('<div style="font-size:.8rem;color:#7c3aed;font-weight:800;margin-bottom:4px;">✅ La primera opción es siempre la correcta</div>', unsafe_allow_html=True)
-            for j in range(1,n_ops+1):
-                lbl=f"✅ Opción {j} — correcta" if j==1 else f"Opción {j} — incorrecta"
-                op_t=st.text_input(lbl,key=f"man_op_{i}_{j}",placeholder=f"Escribe la opcion {j}...")
-                opciones_data.append({"texto":op_t,"correcta":j==1})
-            resp_modelo=st.session_state.get(f"man_op_{i}_1","")
-        preguntas_data.append({"enunciado":enunciado,"tipo":tipo,"respuesta_modelo":resp_modelo,"imagen":imagen_final,"opciones":opciones_data})
-    st.markdown("<br>",unsafe_allow_html=True)
-    col_sv,col_cl=st.columns([3,1])
-    with col_sv:
-        if st.button("Guardar Quiz",use_container_width=True,type="primary",key="man_save"):
-            if not titulo.strip(): st.error("El titulo es obligatorio.")
-            else:
-                preg_validas = [p for p in preguntas_data if p["enunciado"].strip()]
-                if not preg_validas:
-                    st.error("Añade al menos una pregunta con enunciado.")
+            n_ops = 2 if tipo == "test2" else 4
+            st.markdown('<div style="font-size:.8rem;color:#7c3aed;font-weight:800;margin-bottom:4px;">'
+                        '✅ La primera opción es siempre la correcta</div>', unsafe_allow_html=True)
+            for j in range(1, n_ops + 1):
+                lbl = f"✅ Opción {j} — correcta" if j == 1 else f"Opción {j} — incorrecta"
+                op_t = st.text_input(lbl, key=f"man_new_op_{j}", placeholder=f"Opción {j}...")
+                opciones_data.append({"texto": op_t, "correcta": j == 1})
+            resp_modelo = st.session_state.get("man_new_op_1", "")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_ok, col_cancel = st.columns(2)
+        with col_ok:
+            if st.button("✅ Confirmar pregunta", key="man_new_ok",
+                         use_container_width=True, type="primary"):
+                if not enunciado.strip():
+                    st.error("El enunciado no puede estar vacío.")
+                elif not resp_modelo.strip():
+                    st.error("La respuesta modelo no puede estar vacía.")
+                elif tipo in ("test2","test4") and any(not o["texto"].strip() for o in opciones_data):
+                    st.error("Rellena todas las opciones.")
                 else:
-                    try:
-                        db=conectar(); cur=db.cursor()
-                        cur.execute("INSERT INTO quizzes (titulo,id_profesor,seccion) VALUES (%s,%s,%s)",(titulo.strip(),gs("profe_id"),seccion or None))
-                        id_quiz=cur.lastrowid; guardadas=0
-                        for p in preg_validas:
-                            enc=(json.dumps({"texto":p["enunciado"],"imagen":p["imagen"]}) if p["imagen"] else p["enunciado"])
-                            tipo_bd="test" if p["tipo"] in ("test2","test4") else "corta"
-                            cur.execute("INSERT INTO preguntas (id_quiz,enunciado,tipo,respuesta_modelo) VALUES (%s,%s,%s,%s)",(id_quiz,enc,tipo_bd,p["respuesta_modelo"]))
-                            id_preg=cur.lastrowid
-                            for op in p["opciones"]:
-                                if op["texto"].strip():
-                                    cur.execute("INSERT INTO opciones (id_pregunta,texto,es_correcta) VALUES (%s,%s,%s)",(id_preg,op["texto"],op["correcta"]))
-                            guardadas+=1
-                        db.commit(); db.close()
-                        for i in range(gs("num_preg_manual",1)):
-                            st.session_state.pop(f"man_tipo_sel_{i}", None)
-                        ss("_ok_msg",f"Quiz guardado con {guardadas} preguntas."); ss("num_preg_manual",1); ir("biblioteca")
-                    except Exception as e: st.error(f"Error: {e}")
+                    nueva_p = {
+                        "enunciado": enunciado.strip(),
+                        "tipo": tipo,
+                        "respuesta_modelo": resp_modelo.strip(),
+                        "imagen": imagen_final,
+                        "opciones": opciones_data,
+                    }
+                    ss("man_preguntas_guardadas", preguntas_guardadas + [nueva_p])
+                    ss("man_añadiendo", False)
+                    st.rerun()
+        with col_cancel:
+            if st.button("✖ Cancelar", key="man_new_cancel", use_container_width=True):
+                ss("man_añadiendo", False)
+                st.rerun()
+
+    # ── Guardar quiz completo ────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    col_sv, col_cl = st.columns([3, 1])
+    with col_sv:
+        if st.button("💾 Guardar Quiz", use_container_width=True, type="primary", key="man_save"):
+            if not titulo.strip():
+                st.error("El título es obligatorio.")
+            elif not preguntas_guardadas:
+                st.error("Añade al menos una pregunta.")
+            else:
+                try:
+                    db = conectar(); cur = db.cursor()
+                    cur.execute(
+                        "INSERT INTO quizzes (titulo, id_profesor, seccion) VALUES (%s,%s,%s)",
+                        (titulo.strip(), gs("profe_id"), seccion or None)
+                    )
+                    id_quiz = cur.lastrowid
+                    for p in preguntas_guardadas:
+                        enc = (json.dumps({"texto": p["enunciado"], "imagen": p["imagen"]})
+                               if p.get("imagen") else p["enunciado"])
+                        tipo_bd = "test" if p["tipo"] in ("test2","test4") else "corta"
+                        cur.execute(
+                            "INSERT INTO preguntas (id_quiz, enunciado, tipo, respuesta_modelo) "
+                            "VALUES (%s,%s,%s,%s)",
+                            (id_quiz, enc, tipo_bd, p["respuesta_modelo"])
+                        )
+                        id_preg = cur.lastrowid
+                        for op in p.get("opciones", []):
+                            if op["texto"].strip():
+                                cur.execute(
+                                    "INSERT INTO opciones (id_pregunta, texto, es_correcta) VALUES (%s,%s,%s)",
+                                    (id_preg, op["texto"], op["correcta"])
+                                )
+                    db.commit(); db.close()
+                    ss("man_preguntas_guardadas", [])
+                    ss("man_añadiendo", False)
+                    ss("_ok_msg", f"Quiz guardado con {len(preguntas_guardadas)} preguntas.")
+                    ir("biblioteca")
+                except Exception as e:
+                    st.error(f"Error: {e}")
     with col_cl:
-        if st.button("Limpiar",use_container_width=True,key="man_clear"):
-            for i in range(gs("num_preg_manual",1)):
-                st.session_state.pop(f"man_tipo_sel_{i}", None)
-            ss("num_preg_manual",1); st.rerun()
+        if st.button("🗑 Limpiar todo", use_container_width=True, key="man_clear"):
+            ss("man_preguntas_guardadas", [])
+            ss("man_añadiendo", False)
+            st.rerun()
 
 
 # ════════════════════════════════════════════════════════════════════
