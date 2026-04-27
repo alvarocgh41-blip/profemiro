@@ -175,6 +175,21 @@ if "_accion_bd" in st.session_state:
         elif _accion["tipo"] == "cambiar_sala":
             st.session_state["nombre_sala"] = _accion["nombre"]
 
+        elif _accion["tipo"] == "eliminar_sala":
+            _nombre_a_borrar = _accion["nombre"]
+            _cur_dict = _db.cursor(dictionary=True)
+            _cur_dict.execute("SELECT nombre_sala FROM profesores WHERE id_profesor=%s", (_profe_id,))
+            _sala_principal = (_cur_dict.fetchone() or {}).get("nombre_sala", "")
+            if _nombre_a_borrar != _sala_principal:
+                _cur.execute("DELETE FROM salas_activas WHERE nombre_sala=%s", (_nombre_a_borrar,))
+                _cur.execute("DELETE FROM salas_profesor WHERE nombre_sala=%s AND id_profesor=%s",
+                             (_nombre_a_borrar, _profe_id))
+                _db.commit()
+                st.session_state["nombre_sala"] = _sala_principal
+                st.session_state["_ok_msg"] = f"Sala '{_nombre_a_borrar}' eliminada."
+            else:
+                st.session_state["_error_msg"] = "No puedes eliminar tu sala principal."
+
         elif _accion["tipo"] == "eliminar_quiz":
             _id = _accion["id_quiz"]
             _cur.execute("UPDATE salas_activas SET id_quiz_activo=NULL, estado='finalizado' WHERE id_quiz_activo=%s",(_id,))
@@ -578,6 +593,9 @@ hr { border:none !important; border-top:2px solid #f3f4f6 !important; margin:12p
     box-shadow:0 2px 10px rgba(107,70,193,0.08); }
 .sesion-titulo { font-weight:900; color:#4c1d95; font-size:1rem; }
 .sesion-meta { color:#6b7280; font-size:.82rem; margin-top:4px; }
+input[type="password"] + div,
+.stTextInput [data-baseweb="input"] ~ div[class*="tooltip"],
+[data-testid="InputInstructions"] { display:none !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -641,8 +659,9 @@ def render_topbar_profe(nombre_sala=None, tab="launcher"):
             f'<div style="display:flex;align-items:center;gap:10px;padding:8px 0;">'
             f'{logo_svg(36)}'
             f'<span style="font-size:1.3rem;font-weight:900;color:#4c1d95;">Profe<span style="color:#7c3aed;">Miro</span></span>'
-            f'<span style="font-size:0.7rem;font-weight:800;color:#a78bfa;background:#ede9fe;'
-            f'border-radius:20px;padding:2px 8px;margin-left:4px;">v6</span>'
+            f'<span style="font-size:0.72rem;font-weight:900;color:white;background:#7c3aed;'
+            f'border-radius:20px;padding:3px 10px;margin-left:6px;'
+            f'border:2px solid #a78bfa;letter-spacing:0.5px;">v6</span>'
             f'&nbsp;{chip}</div>',
             unsafe_allow_html=True)
     with col_nav:
@@ -665,8 +684,14 @@ def render_topbar_profe(nombre_sala=None, tab="launcher"):
 
 def render_topbar(sala=None):
     chip = f'<span class="sala-chip">🏫 {sala}</span>' if sala else ""
-    st.markdown(f'<div class="topbar"><div class="topbar-logo">{logo_svg(38)}&nbsp;Profe<span>Miro</span></div>{chip}</div>',
-                unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="topbar"><div class="topbar-logo">'
+        f'{logo_svg(38)}&nbsp;Profe<span>Miro</span>'
+        f'<span style="font-size:0.72rem;font-weight:900;color:white;background:#7c3aed;'
+        f'border-radius:20px;padding:3px 10px;margin-left:6px;'
+        f'border:2px solid #a78bfa;letter-spacing:0.5px;">v6</span>'
+        f'</div>{chip}</div>',
+        unsafe_allow_html=True)
 
 def _extraer_json(raw):
     raw = raw.strip()
@@ -819,7 +844,7 @@ def main():
 def pg_alumno_join():
     st.markdown("""<style>.stApp{background:linear-gradient(135deg,#667eea,#764ba2)!important;}
     .block-container{max-width:520px!important;margin:0 auto!important;}</style>""", unsafe_allow_html=True)
-    st.markdown(f'<div class="join-logo">{logo_svg(72)}<h1>ProfeMiro</h1><p>Sistema de examenes inteligente</p></div>',
+    st.markdown(f'<div class="join-logo">{logo_svg(72)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro</div><p>Sistema de examenes inteligente</p></div>',
                 unsafe_allow_html=True)
     st.markdown("### Unirse al Examen")
     nombre = st.text_input("Tu nombre completo", placeholder="Ej: Ana Garcia Lopez", key="j_nombre")
@@ -1203,8 +1228,8 @@ def pg_alumno_fin():
 def pg_login():
     st.markdown("""<style>.stApp{background:linear-gradient(135deg,#667eea,#764ba2)!important;}
     .block-container{max-width:480px!important;margin:0 auto!important;}</style>""",unsafe_allow_html=True)
-    st.markdown(f'<div class="join-logo">{logo_svg(60)}<h1>ProfeMiro</h1><p>Panel del Profesor</p></div>',unsafe_allow_html=True)
-    st.markdown("### Iniciar Sesion")
+    st.markdown(f'<div class="join-logo">{logo_svg(60)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro</div><p>Panel del Profesor</p></div>',unsafe_allow_html=True)
+    st.markdown('<div style="font-size:1.4rem;font-weight:900;color:white;margin-bottom:16px;">Iniciar Sesión</div>', unsafe_allow_html=True)
     email=st.text_input("Email",placeholder="tu@email.com",key="l_email")
     password=st.text_input("Contrasena",type="password",key="l_pass")
     if st.button("Iniciar Sesion",use_container_width=True,type="primary",key="l_btn"):
@@ -1229,7 +1254,7 @@ def pg_login():
 def pg_register():
     st.markdown("""<style>.stApp{background:linear-gradient(135deg,#667eea,#764ba2)!important;}
     .block-container{max-width:480px!important;margin:0 auto!important;}</style>""",unsafe_allow_html=True)
-    st.markdown(f'<div class="join-logo">{logo_svg(60)}<h1>ProfeMiro</h1><p>Crea tu cuenta</p></div>',unsafe_allow_html=True)
+    st.markdown(f'<div class="join-logo">{logo_svg(60)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro</div><p>Crea tu cuenta</p></div>',unsafe_allow_html=True)
     nombre=st.text_input("Nombre completo",placeholder="Prof. Garcia",key="reg_n")
     email=st.text_input("Email",placeholder="tu@email.com",key="reg_e")
     password=st.text_input("Contrasena",type="password",key="reg_p")
@@ -1311,7 +1336,7 @@ def pg_launcher():
         salas_html += f'<span class="sala-tag {activa_cls}">{s}</span>'
     st.markdown(f'<div style="margin-bottom:10px;">{salas_html}</div>', unsafe_allow_html=True)
 
-    col_sel, col_new, col_crear = st.columns([2, 2, 1])
+    col_sel, col_new, col_crear, col_borrar = st.columns([2, 2, 1, 1])
     with col_sel:
         idx_sala = mis_salas.index(nombre_sala) if nombre_sala in mis_salas else 0
         sala_elegida = st.selectbox("Sala activa", mis_salas, index=idx_sala, key="l_sala_sel", label_visibility="collapsed")
@@ -1331,6 +1356,21 @@ def pg_launcher():
                 ss("_accion_bd",{"tipo":"crear_sala","nombre":cod})
             st.rerun()
         st.markdown("</div>",unsafe_allow_html=True)
+    with col_borrar:
+        st.markdown("<div style='margin-top:4px;'>", unsafe_allow_html=True)
+        sala_es_principal = (nombre_sala == get_salas_profe(profe_id)[0] if get_salas_profe(profe_id) else True)
+        confirm_del_sala = gs(f"confirm_del_sala_{nombre_sala}", False)
+        lbl_del_sala = "⚠️ ¿Seguro?" if confirm_del_sala else "🗑 Sala"
+        if st.button(lbl_del_sala, key=f"l_del_sala_{nombre_sala}", use_container_width=True,
+                     disabled=sala_es_principal or sala_activa,
+                     type="primary" if confirm_del_sala else "secondary"):
+            if confirm_del_sala:
+                ss(f"confirm_del_sala_{nombre_sala}", False)
+                ss("_accion_bd", {"tipo": "eliminar_sala", "nombre": nombre_sala})
+            else:
+                ss(f"confirm_del_sala_{nombre_sala}", True)
+            st.rerun()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("<br>",unsafe_allow_html=True)
 
