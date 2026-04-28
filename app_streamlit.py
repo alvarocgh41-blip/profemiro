@@ -844,9 +844,13 @@ def main():
 def pg_alumno_join():
     st.markdown("""<style>.stApp{background:linear-gradient(135deg,#667eea,#764ba2)!important;}
     .block-container{max-width:520px!important;margin:0 auto!important;}</style>""", unsafe_allow_html=True)
-    st.markdown(f'<div class="join-logo">{logo_svg(72)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro</div><p>Sistema de examenes inteligente</p></div>',
+    st.markdown(f'<div class="join-logo">{logo_svg(72)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro'
+                f'<span style="font-size:0.72rem;font-weight:900;color:white;background:rgba(255,255,255,0.25);'
+                f'border-radius:20px;padding:3px 10px;margin-left:8px;'
+                f'border:2px solid rgba(255,255,255,0.5);letter-spacing:0.5px;vertical-align:middle;">v6</span>'
+                f'</div><p>Sistema de examenes inteligente</p></div>',
                 unsafe_allow_html=True)
-    st.markdown("### Unirse al Examen")
+    st.markdown('<div style="font-size:1.6rem;font-weight:900;color:white;margin-bottom:16px;">Unirse al Examen</div>', unsafe_allow_html=True)
     nombre = st.text_input("Tu nombre completo", placeholder="Ej: Ana Garcia Lopez", key="j_nombre")
     sala   = st.text_input("Codigo de sala", placeholder="Ej: SALA101", key="j_sala")
     if st.button("Entrar al Examen", use_container_width=True, type="primary", key="j_btn"):
@@ -1228,7 +1232,11 @@ def pg_alumno_fin():
 def pg_login():
     st.markdown("""<style>.stApp{background:linear-gradient(135deg,#667eea,#764ba2)!important;}
     .block-container{max-width:480px!important;margin:0 auto!important;}</style>""",unsafe_allow_html=True)
-    st.markdown(f'<div class="join-logo">{logo_svg(60)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro</div><p>Panel del Profesor</p></div>',unsafe_allow_html=True)
+    st.markdown(f'<div class="join-logo">{logo_svg(60)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro'
+                f'<span style="font-size:0.72rem;font-weight:900;color:white;background:rgba(255,255,255,0.25);'
+                f'border-radius:20px;padding:3px 10px;margin-left:8px;'
+                f'border:2px solid rgba(255,255,255,0.5);letter-spacing:0.5px;vertical-align:middle;">v6</span>'
+                f'</div><p>Panel del Profesor</p></div>',unsafe_allow_html=True)
     st.markdown('<div style="font-size:1.4rem;font-weight:900;color:white;margin-bottom:16px;">Iniciar Sesión</div>', unsafe_allow_html=True)
     email=st.text_input("Email",placeholder="tu@email.com",key="l_email")
     password=st.text_input("Contrasena",type="password",key="l_pass")
@@ -1254,7 +1262,11 @@ def pg_login():
 def pg_register():
     st.markdown("""<style>.stApp{background:linear-gradient(135deg,#667eea,#764ba2)!important;}
     .block-container{max-width:480px!important;margin:0 auto!important;}</style>""",unsafe_allow_html=True)
-    st.markdown(f'<div class="join-logo">{logo_svg(60)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro</div><p>Crea tu cuenta</p></div>',unsafe_allow_html=True)
+    st.markdown(f'<div class="join-logo">{logo_svg(60)}<div style="color:white;font-size:2.4rem;font-weight:900;margin:10px 0 4px;letter-spacing:-1px;">ProfeMiro'
+                f'<span style="font-size:0.72rem;font-weight:900;color:white;background:rgba(255,255,255,0.25);'
+                f'border-radius:20px;padding:3px 10px;margin-left:8px;'
+                f'border:2px solid rgba(255,255,255,0.5);letter-spacing:0.5px;vertical-align:middle;">v6</span>'
+                f'</div><p>Crea tu cuenta</p></div>',unsafe_allow_html=True)
     nombre=st.text_input("Nombre completo",placeholder="Prof. Garcia",key="reg_n")
     email=st.text_input("Email",placeholder="tu@email.com",key="reg_e")
     password=st.text_input("Contrasena",type="password",key="reg_p")
@@ -1403,27 +1415,14 @@ def pg_launcher():
         <div class="stat-box" style="min-width:90px;"><div class="stat-num">{total_alumnos}</div><div class="stat-lbl">Alumnos</div></div>
         <div style="flex:1;">{sala_html}</div></div>""",unsafe_allow_html=True)
 
-    c_abrir, c_terminar, c_cerrar = st.columns(3)
-    with c_abrir:
-        puede_abrir = (not sala_abierta)
-        if st.button("🔓 Abrir sala", use_container_width=True, key="l_reabrir",
-                     disabled=not puede_abrir, type="secondary"):
-            ss("_accion_bd",{"tipo":"reabrir_sesion"}); st.rerun()
-    with c_terminar:
-        if st.button("⏹ Cerrar acceso", use_container_width=True, key="l_terminar",
-                     disabled=not sala_activa, type="primary"):
-            ss("_accion_bd",{"tipo":"terminar_examen"}); st.rerun()
-    with c_cerrar:
+    if sala_abierta:
         if st.button("🔒 Cerrar sala", use_container_width=True, key="l_cerrar",
                      disabled=sala_activa, type="secondary"):
             ss("_accion_bd",{"tipo":"cerrar_sala"}); st.rerun()
-
-    if sala_activa:
-        st.markdown('<div style="background:#fef3c7;border-radius:10px;padding:8px 16px;'
-                    'margin-top:8px;font-size:.8rem;color:#92400e;font-weight:700;">'
-                    '⚠️ <b>Cerrar acceso</b> impide que nuevos alumnos entren. '
-                    'La sala sigue abierta para ver resultados.</div>',
-                    unsafe_allow_html=True)
+    else:
+        if st.button("🔓 Abrir sala", use_container_width=True, key="l_reabrir",
+                     type="secondary"):
+            ss("_accion_bd",{"tipo":"reabrir_sesion"}); st.rerun()
 
     # ── Consola de sala ──────────────────────────────────────────
     if sala_activa and registros is not None:
@@ -1482,16 +1481,21 @@ def pg_launcher():
             es_activo = sala_activa and sala_info["id_quiz_activo"]==quiz["id_quiz"]
             badge = ('<span class="badge badge-green">● Activo</span>' if es_activo else '<span class="badge badge-gray">Inactivo</span>')
             st.markdown(f'<div class="quiz-item"><div class="quiz-title">{quiz["titulo"]}</div><div style="margin-top:4px;">{badge}</div></div>',unsafe_allow_html=True)
-            lbl_lanzar = "● Ya activo" if es_activo else "🚀 Lanzar"
-            if st.button(lbl_lanzar, key=f"l_lanzar_{quiz['id_quiz']}", use_container_width=True,
-                         type="primary", disabled=es_activo):
-                nombre_ses = gs("l_nombre_sesion","").strip()
-                if not nombre_ses:
-                    ss("_error_msg","Escribe un nombre para la sesión antes de lanzar.")
-                    st.rerun()
-                else:
-                    ss("_accion_bd",{"tipo":"lanzar_quiz","id_quiz":quiz["id_quiz"],"nombre_sesion":nombre_ses})
-                    st.rerun()
+            if es_activo:
+                if st.button("⏹ Finalizar examen", key=f"l_lanzar_{quiz['id_quiz']}",
+                             use_container_width=True, type="primary"):
+                    ss("_accion_bd",{"tipo":"terminar_examen"}); st.rerun()
+            else:
+                if st.button("🚀 Lanzar", key=f"l_lanzar_{quiz['id_quiz']}",
+                             use_container_width=True, type="primary",
+                             disabled=sala_activa):
+                    nombre_ses = gs("l_nombre_sesion","").strip()
+                    if not nombre_ses:
+                        ss("_error_msg","Escribe un nombre para la sesión antes de lanzar.")
+                        st.rerun()
+                    else:
+                        ss("_accion_bd",{"tipo":"lanzar_quiz","id_quiz":quiz["id_quiz"],"nombre_sesion":nombre_ses})
+                        st.rerun()
             st.markdown("<hr>",unsafe_allow_html=True)
 
     st.markdown("<br>",unsafe_allow_html=True)
