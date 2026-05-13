@@ -1322,8 +1322,10 @@ def pg_launcher():
             try:
                 cur.execute(
                     "SELECT nombre_alumno, hora_entrada, hora_salida FROM sala_registro "
-                    "WHERE nombre_sala=%s AND id_quiz=%s ORDER BY hora_entrada DESC",
-                    (nombre_sala, sala_info["id_quiz_activo"])
+                    "WHERE nombre_sala=%s AND id_quiz=%s AND hora_entrada >= ("
+                    "SELECT COALESCE(fecha_creacion, '2000-01-01') FROM sesiones_examen "
+                    "WHERE id_sesion=%s) ORDER BY hora_entrada DESC",
+                    (nombre_sala, sala_info["id_quiz_activo"], sala_info.get("id_sesion_activa"))
                 )
                 registros = cur.fetchall()
             except: pass
